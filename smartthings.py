@@ -23,7 +23,6 @@ import requests
 import pprint
 import json
 
-
 # # import httplib
 # # httplib.HTTPConnection.debuglevel = 1
 
@@ -36,6 +35,7 @@ except:
         @staticmethod
         def log(**ad):
             pprint.pprint(ad)
+
 
 class SmartThings(object):
     def __init__(self, verbose=True):
@@ -76,7 +76,6 @@ class SmartThings(object):
             endpoints_paramd,
             self.endpointd
         )
-	print "---------------"
 
     def request_devices(self, device_type):
         """List the devices"""
@@ -89,9 +88,10 @@ class SmartThings(object):
         }
 
         devices_response = requests.get(url=devices_url, params=devices_paramd, headers=devices_headerd)
-	print devices_response
+        if self.verbose:
+            print (devices_response)
         self.deviceds = devices_response.json()
-	pprint.pprint(self.deviceds)
+        pprint.pprint(self.deviceds)
         for switchd in self.deviceds:
             switchd['url'] = "%s/%s" % (devices_url, switchd['id'],)
 
@@ -103,13 +103,14 @@ class SmartThings(object):
             self.deviceds
         )
 
-	pprint.pprint(self.deviceds)
+        pprint.pprint(self.deviceds)
         return self.deviceds
 
     def device_request(self, deviced, requestd):
         """Send a request the named device"""
 
-	print "requesting"
+        if self.verbose:
+            print ("requesting")
         command_url = deviced['url']
         command_paramd = {
             "access_token": self.std["access_token"]
@@ -117,59 +118,62 @@ class SmartThings(object):
         command_headerd = {}
 
         command_response = requests.put(
-            url=command_url,
-            params=command_paramd,
-            headers=command_headerd,
-            data=json.dumps(requestd)
+                url=command_url,
+                params=command_paramd,
+                headers=command_headerd,
+                data=json.dumps(requestd)
         )
-	pprint.pprint(command_response)
+        pprint.pprint(command_response)
+
 
 if __name__ == '__main__':
-    dtypes = [ 
+    dtypes = [
         "Hue Bulb", "switch", "motion", "presence", "acceleration", "contact",
         "temperature", "battery", "acceleration", "threeAxis",
     ]
 
     parser = OptionParser()
     parser.add_option(
-        "", "--debug",
-        default=False,
-        action="store_true",
-        dest="debug",
-        help="",
+            "", "--debug",
+            default=False,
+            action="store_true",
+            dest="debug",
+            help="",
     )
     parser.add_option(
-        "", "--verbose",
-        default=False,
-        action="store_true",
-        dest="verbose",
-        help="",
+            "", "--verbose",
+            default=False,
+            action="store_true",
+            dest="verbose",
+            help="",
     )
     parser.add_option(
-        "", "--type",
-        dest="device_type",
-        help="The device type (required), one of %s" % ", ".join(dtypes)
+            "", "--type",
+            dest="device_type",
+            help="The device type (required), one of %s" % ", ".join(dtypes)
     )
     parser.add_option(
-        "", "--id",
-        dest="device_id",
-        help="The ID or Name of the device to manipulate"
+            "", "--id",
+            dest="device_id",
+            help="The ID or Name of the device to manipulate"
     )
     parser.add_option(
-        "", "--request",
-        dest="request",
-        help="Something to do, e.g. 'switch=1', 'switch=0'"
+            "", "--request",
+            dest="request",
+            help="Something to do, e.g. 'switch=1', 'switch=0'"
     )
 
     (options, args) = parser.parse_args()
 
-    pprint.pprint(options)
-    pprint.pprint(args)
+    if options.verbose:
+        print ("options: ")
+        pprint.pprint(options)
+        print ("args")
+        pprint.pprint(args)
     if not options.device_type:
-        print >> sys.stderr, "%s: --type <%s>" % (sys.argv[0], "|".join(dtypes))
+        print("%s: --type <%s>" % (sys.argv[0], "|".join(dtypes)))
         parser.print_help(sys.stderr)
         sys.exit(1)
-        
 
     st = SmartThings(verbose=options.verbose)
     st.load_settings()
@@ -177,27 +181,31 @@ if __name__ == '__main__':
 
     ds = st.request_devices(options.device_type)
     if options.device_id:
-        ds = filter(lambda d: options.device_id in [ d.get("id"), d.get("label"), ], ds)
+        ds = filter(lambda d: options.device_id in [d.get("id"), d.get("label"), ], ds)
 
-    if options.request:
-        try:
-            key, value = options.request.split('=', 2)
-        except:
-            pprint.pprint(options.request)
-        try:
-            value = int(value)
-        except ValueError:
-            pass
+    if len(args) > 0:
+        print ("command = ")
+        pprint.pprint(args)
+        requestd = args
+    elif options.request:
+        if "=" in options.request:
+            try:
+                key, value = options.request.split('=', 2)
+            except:
+                pprint.pprint(options.request)
+            try:
+                value = int(value)
+            except ValueError:
+                pass
 
-        requestd = {
-            key: value
-        }
+            requestd = {
+                key: value
+            }
+        else:
+            requestd = [options.request]
+    pprint.pprint(ds)
+    for d in ds:
+        iotdb_log.log(device=d, request=requestd)
+        st.device_request(d, requestd)
 
-	pprint.pprint(ds)
-	print "ok"
-        for d in ds:
-            iotdb_log.log(device=d, request=requestd)
-            st.device_request(d, requestd)
-
-    else:
-        print json.dumps(ds, indent=2, sort_keys=True)
+        # print (json.dumps(ds, indent=2, sort_keys=True))
